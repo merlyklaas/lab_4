@@ -1,0 +1,139 @@
+---
+title: "lab_4"
+author: "Merly Klaas"
+date: "10/20/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(Lahman)
+library(tidyverse)
+library(janitor)
+library(here)
+library(readxl)
+library(rio)
+library(readr)
+library(haven)
+```
+## 1. Produce a subset of the data (as a new object) that has the following characteristics:
+* only one team (your choice)
+* (try to you select a team that is currently still around, or it probably won’t be interesting; see a list of current teams at http://www.espn.com/mlb/teams).
+* data from 1980 to present (or as current as the dataset allows)
+* includes 5 columns: name, yearID, W, L, R, RA. These 5 variables correspond to the team name, the year, wins, losses, runs scored, and runs allowed).
+```{r}
+dodgers <- Teams %>% 
+  filter(name == "Los Angeles Dodgers", yearID >= 1980) %>% 
+  select(name, yearID, W, L, R, RA) %>% 
+  as_tibble() %>% 
+  clean_names()
+```
+## 2. Create a new variable corresponding to the winning percentage for the team you chose over time:
+```{r}
+dodgers %>% 
+  mutate(wpct = w/(w+l)) %>% 
+  arrange(wpct) %>% 
+  mutate(mean_wpct = mean(wpct), sd_wpct = sd(wpct))
+```
+## 3. With the full Teams data:
+* Compute the mean and standard deviation of winning percentage for each team and then order by winning percentage, greatest to least
+
+```{r}
+Teams <-Teams %>%  
+  clean_names() %>% 
+  select(name, year_id, w, l, r, ra) %>% 
+  mutate(wpct = w/(w+l)) %>% 
+  arrange()
+
+
+teams1 <- Teams %>% 
+  select(name, year_id, wpct, everything()) %>% 
+  group_by(name) %>% 
+  summarize(mean_wpct= mean (wpct, na.rm= TRUE), sd_wpct= sd(wpct,na.rm=TRUE))
+teams1
+```
+
+
+# 4. Use the full data to reproduce the plot below
+```{r}
+Teams %>%  
+  filter (name=="Detroit Tigers"|
+            name== "New York Yankees" | 
+            name == "San Diego Padres")  %>%
+  arrange(desc(wpct)) %>% 
+  ggplot (aes(year_id, wpct, color = name))+
+  geom_line() +
+  labs (color= "Team")
+```
+
+## Plot 2
+# 1. Read in the following three datasets, using {here} and the package of your choice ({rio}, {readr}, {haven}, {readxl})
+* sesame13.sav
+* star.csv
+* ais.xlsx
+Hint: For the ais.xlsx data, look at the skip argument within the {readxl} help documentation.
+
+```{r}
+sesame13 <- import(here ("data", "sesame13.sav"))
+star <- read_csv(here("data","star.csv"))
+ais <- read_excel(here("data", "ais.xlsx"), sheet = "ais.csv", skip =14)
+```
+
+# 2. Using the ais data, compute the average red blood cell count and average bmi by sport. Output these data as SPSS and EXCEL files.
+```{r}
+mean_rcc_bmi <- ais %>% 
+  group_by(sport) %>% 
+  summarize (mean_rcc = mean(rcc, na.rm=TRUE), 
+             mean_bmi = mean (bmi, na.rm= TRUE))
+export(mean_rcc_bmi, here("data", "mean_rcc_bmi.sav"))
+export(mean_rcc_bmi, here("data", "mean_rcc_bmi.xlsx"))
+
+```
+
+# 3. Use the sesame data to answer the following question: Was the average female age higher in schools or at home?
+
+Answer: at school M=53.056
+```{r}
+sesame13 %>% 
+  as_tibble() %>% 
+  characterize() %>% 
+  group_by(sex, setting) %>% 
+  summarize (mean= mean(age))
+```
+# 4. First, how many rows and columns are in the star data? Next, remove outliers using a really poor method, just for practice, by eliminating students whose math (tmathss) scores were more than three standard deviations above or below the corresponding mean. How many rows are in the data now?
+```{r}
+dim(star) #12 columns , 5748 rows
+m <- mean(star$tmathss)
+sd<- sd(star$tmathss)
+out.u <- m+(3*sd)
+out.l <- m-(3*sd)
+no.out <- filter(star, tmathss < out.u & tmathss > out.l) #Row in the data after taking out the outliers = 5743
+dim (no.out)
+
+#filter (tmathss <= mean(tmathss) -3*sd(tmathss)
+```
+
+5. Use the star data to compute standardized math and reading scores; name these variables tmathss and treadss. To create standardized scores, for each variable (math and reading), subtract the mean from each observation and divide by the standard deviation
+```{r}
+star1 <- star %>% 
+  mutate (tmathss = (tmathss-m)/sd, treadss = (treadss-mean(treadss))/sd(treadss))
+```
+
+Compute the mean of the standardized variable for all sex/frl combinations. (I’m asking you to extend what you know here. We haven’t talked explicitly about how to do this yet, but you have seen examples).
+```{r}
+star1 %>% 
+  summarize(mean_tmathss = mean(tmathss), mean_treadss = mean(treadss), 
+            sd_tmathsd = sd(tmathss), sd_treadsd = sd(treadss))
+```
+
+```{r}
+star1 %>% 
+  group_by(sex, frl) %>% 
+  summarize(mean_tmathss = mean (tmathss), mean_treadss = mean(treadss), 
+            sd_tmathsd = sd(tmathss), sd_treadsd = sd(treadss))
+  
+```
+What do you make of these findings? Do you see an effect by sex? An frl effect (frl stands for free/reduced lunch, and is a rough proxy for household income)? Is there evidence of an interaction (i.e., that the effect of frl is greater for boys versus girls)?
+
+Answer : In average, student with frl status performed lower than their peers. The effect of frl status on academic achievement is greater for boys than girls. 
+
